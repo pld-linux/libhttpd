@@ -1,0 +1,2574 @@
+diff -urN libhttpd-1.3/configure libhttpd-1.3-persistent-e/configure
+--- libhttpd-1.3/configure	2002-02-25 22:41:18.000000000 -0700
++++ libhttpd-1.3-persistent-e/configure	2003-08-21 17:49:39.000000000 -0600
+@@ -547,7 +547,7 @@
+   for ac_dir in $ac_dummy; do
+     test -z "$ac_dir" && ac_dir=.
+     if test -f $ac_dir/$ac_word; then
+-      ac_cv_prog_CC="gcc"
++      ac_cv_prog_CC="g++"
+       break
+     fi
+   done
+@@ -754,7 +754,7 @@
+   fi
+ fi
+ 
+-if test "$ac_cv_prog_CC" = "gcc"; 
++if test "$ac_cv_prog_CC" = "g++"; 
+ then
+ 	WALL=-Wall
+ else
+diff -urN libhttpd-1.3/configure.in libhttpd-1.3-persistent-e/configure.in
+--- libhttpd-1.3/configure.in	2002-02-25 22:41:18.000000000 -0700
++++ libhttpd-1.3-persistent-e/configure.in	2003-08-21 17:49:39.000000000 -0600
+@@ -11,7 +11,7 @@
+ echo "Configuring libhttpd"
+ 
+ AC_PROG_CC
+-if test "$ac_cv_prog_CC" = "gcc"; 
++if test "$ac_cv_prog_CC" = "g++"; 
+ then
+ 	WALL=-Wall
+ else
+diff -urN libhttpd-1.3/Makefile.tmpl libhttpd-1.3-persistent-e/Makefile.tmpl
+--- libhttpd-1.3/Makefile.tmpl	2002-02-25 22:41:18.000000000 -0700
++++ libhttpd-1.3-persistent-e/Makefile.tmpl	2003-08-21 17:49:40.000000000 -0600
+@@ -1,3 +1,3 @@
+ !directory src all,clean,very-clean,install
+-!directory test all,clean,very-clean,install
++#!directory test all,clean,very-clean,install
+ 
+diff -urN libhttpd-1.3/src/api.c libhttpd-1.3-persistent-e/src/api.c
+--- libhttpd-1.3/src/api.c	2002-11-24 19:15:51.000000000 -0700
++++ libhttpd-1.3-persistent-e/src/api.c	2003-08-21 20:37:26.000000000 -0600
+@@ -14,7 +14,7 @@
+ ** connection with the use or performance of this software.
+ **
+ **
+-** $Id$
++** $Id$
+ **
+ */
+ 
+@@ -38,7 +38,12 @@
+ #include <netdb.h>
+ #endif
+ 
++#ifdef __sgi__
++#include <snprintf.h>
++#endif
++
+ #include "config.h"
++#include "select.h"
+ #include "httpd.h"
+ #include "httpd_priv.h"
+ 
+@@ -49,31 +54,32 @@
+ #endif
+ 
+ 
+-char *httpdUrlEncode(str)
+-	char	*str;
++
++char *httpdUrlEncode( 
++        char    *str )
+ {
+-        char    *new,
+-                *cp;
++        char    *new_;
++        char    *cp;
+ 
+-        new = (char *)_httpd_escape(str);
+-	if (new == NULL)
++        new_ = (char *)_httpd_escape(str);
++	if (new_ == NULL)
+ 	{
+ 		return(NULL);
+ 	}
+-        cp = new;
++        cp = new_;
+         while(*cp)
+         {
+                 if (*cp == ' ')
+                         *cp = '+';
+                 cp++;
+         }
+-	return(new);
++	return(new_);
+ }
+ 
+ 
+ 
+-char *httpdRequestMethodName(server)
+-	httpd	*server;
++char *httpdRequestMethodName(
++	httpd	*server)
+ {
+ 	static	char	tmpBuf[255];
+ 
+@@ -89,9 +95,9 @@
+ }
+ 
+ 
+-httpVar *httpdGetVariableByName(server, name)
+-	httpd	*server;
+-	char	*name;
++httpVar *httpdGetVariableByName(
++	httpd	*server,
++	char	*name)
+ {
+ 	httpVar	*curVar;
+ 
+@@ -107,9 +113,9 @@
+ 
+ 
+ 
+-httpVar *httpdGetVariableByPrefix(server, prefix)
+-	httpd	*server;
+-	char	*prefix;
++httpVar *httpdGetVariableByPrefix(
++	httpd	*server,
++	char	*prefix)
+ {
+ 	httpVar	*curVar;
+ 
+@@ -126,10 +132,10 @@
+ }
+ 
+ 
+-httpVar *httpdGetVariableByPrefixedName(server, prefix, name)
+-	httpd	*server;
++httpVar *httpdGetVariableByPrefixedName(
++	httpd	*server,
+ 	char	*prefix,
+-		*name;
++	char	*name)
+ {
+ 	httpVar	*curVar;
+ 	int	prefixLen;
+@@ -151,9 +157,9 @@
+ }
+ 
+ 
+-httpVar *httpdGetNextVariableByPrefix(curVar, prefix)
+-	httpVar	*curVar;
+-	char	*prefix;
++httpVar *httpdGetNextVariableByPrefix(
++	httpVar	*curVar,
++	char	*prefix)
+ {
+ 	if(curVar)
+ 		curVar = curVar->nextVariable;
+@@ -167,16 +173,16 @@
+ }
+ 
+ 
+-int httpdAddVariable(server, name, value)
+-	httpd	*server;
++int httpdAddVariable(
++	httpd	*server,
+ 	char	*name,
+-		*value;
++	char	*value)
+ {
+ 	httpVar *curVar, *lastVar, *newVar;
+ 
+ 	while(*name == ' ' || *name == '\t')
+ 		name++;
+-	newVar = malloc(sizeof(httpVar));
++	newVar = (httpVar*)malloc(sizeof(httpVar));
+ 	bzero(newVar, sizeof(httpVar));
+ 	newVar->name = strdup(name);
+ 	newVar->value = strdup(value);
+@@ -205,11 +211,11 @@
+ 	return(0);
+ }
+ 
+-httpd *httpdCreate(host, port)
+-	char	*host;
+-	int	port;
++httpd *httpdCreate(
++	char	*host,
++	int	port)
+ {
+-	httpd	*new;
++	httpd	*new_;
+ 	int	sock,
+ 		opt;
+         struct  sockaddr_in     addr;
+@@ -217,18 +223,18 @@
+ 	/*
+ 	** Create the handle and setup it's basic config
+ 	*/
+-	new = malloc(sizeof(httpd));
+-	if (new == NULL)
++	new_ = (httpd*)malloc(sizeof(httpd));
++	if (new_ == NULL)
+ 		return(NULL);
+-	bzero(new, sizeof(httpd));
+-	new->port = port;
++	bzero(new_, sizeof(httpd));
++	new_->port = port;
+ 	if (host == HTTP_ANY_ADDR)
+-		new->host = HTTP_ANY_ADDR;
++		new_->host = HTTP_ANY_ADDR;
+ 	else
+-		new->host = strdup(host);
+-	new->content = (httpDir*)malloc(sizeof(httpDir));
+-	bzero(new->content,sizeof(httpDir));
+-	new->content->name = strdup("");
++		new_->host = strdup(host);
++	new_->content = (httpDir*)malloc(sizeof(httpDir));
++	bzero(new_->content,sizeof(httpDir));
++	new_->content->name = strdup("");
+ 
+ 	/*
+ 	** Setup the socket
+@@ -273,38 +279,46 @@
+ 	sock = socket(AF_INET, SOCK_STREAM, 0);
+ 	if (sock  < 0)
+ 	{
+-		free(new);
++		free(new_);
+ 		return(NULL);
+ 	}
+ #	ifdef SO_REUSEADDR
+ 	opt = 1;
+ 	setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (char*)&opt,sizeof(int));
+ #	endif
+-	new->serverSock = sock;
++	new_->serverSock = sock;
+ 	bzero(&addr, sizeof(addr));
+ 	addr.sin_family = AF_INET;
+-	if (new->host == HTTP_ANY_ADDR)
++	if (new_->host == HTTP_ANY_ADDR)
+ 	{
+ 		addr.sin_addr.s_addr = htonl(INADDR_ANY);
+ 	}
+ 	else
+ 	{
+-		addr.sin_addr.s_addr = inet_addr(new->host);
++		addr.sin_addr.s_addr = inet_addr(new_->host);
++	}
++	addr.sin_port = htons((u_short)new_->port);
++	if (_httpd_setnonblocking(sock) < 0)
++	{
++		close(sock);
++		free(new_);
++		return(NULL);
+ 	}
+-	addr.sin_port = htons((u_short)new->port);
+ 	if (bind(sock,(struct sockaddr *)&addr,sizeof(addr)) <0)
+ 	{
+ 		close(sock);
+-		free(new);
++		free(new_);
+ 		return(NULL);
+ 	}
+ 	listen(sock, 128);
+-	new->startTime = time(NULL);
+-	return(new);
++	new_->startTime = time(NULL);
++	new_->clients = new Clients();
++	return(new_);
+ }
+ 
+-void httpdDestroy(server)
+-	httpd	*server;
++	
++void httpdDestroy(
++	httpd	*server)
+ {
+ 	if (server == NULL)
+ 		return;
+@@ -313,91 +327,30 @@
+ 	free(server);
+ }
+ 
+-
+-
+-int httpdGetConnection(server, timeout)
+-	httpd	*server;
+-	struct	timeval *timeout;
+-{
+-	int	result;
+-	fd_set	fds;
+-	struct  sockaddr_in     addr;
+-	size_t  addrLen;
+-	char	*ipaddr;
+-
+-	FD_ZERO(&fds);
+-	FD_SET(server->serverSock, &fds);
+-	result = 0;
+-	while(result == 0)
+-	{
+-		result = select(server->serverSock + 1, &fds, 0, 0, timeout);
+-		if (result < 0)
+-		{
+-			return(-1);
+-		}
+-		if (timeout != 0 && result == 0)
+-		{
+-			return(0);
+-		}
+-		if (result > 0)
+-		{
+-			break;
+-		}
+-	}
+-	bzero(&addr, sizeof(addr));
+-	addrLen = sizeof(addr);
+-	server->clientSock = accept(server->serverSock,(struct sockaddr *)&addr,
+-		&addrLen);
+-	ipaddr = inet_ntoa(addr.sin_addr);
+-	if (ipaddr)
+-		strncpy(server->clientAddr, ipaddr, HTTP_IP_ADDR_LEN);
+-	else
+-		*server->clientAddr = 0;
+-	server->readBufRemain = 0;
+-	server->readBufPtr = NULL;
+-
+-	/*
+-	** Check the default ACL
+-	*/
+-	if (server->defaultAcl)
+-	{
+-		if (httpdCheckAcl(server, server->defaultAcl) == HTTP_ACL_DENY)
+-		{
+-			httpdEndRequest(server);
+-			return(-2);
+-		}
+-	}
+-	return(1);
+-}
+-
+-
+-
+-int httpdReadRequest(server)
+-	httpd	*server;
++int httpdReadRequest(
++	httpd	*server)
+ {
+ 	static	char	buf[HTTP_MAX_LEN];
+ 	int	count,
+ 		inHeaders;
+ 	char	*cp, *cp2;
+-	int	_httpd_decode();
+-
+-
++	
+ 	/*
+ 	** Setup for a standard response
+ 	*/
+ 	strcpy(server->response.headers,
+-		"Server: Hughes Technologies Embedded Server\n"); 
++		"Server: Hughes Technologies Embedded Server (persistent patch)\r\n"); 
+ 	strcpy(server->response.contentType, "text/html");
+-	strcpy(server->response.response,"200 Output Follows\n");
++	strcpy(server->response.response,"200 OK\r\n");
+ 	server->response.headersSent = 0;
+-
++	server->request.contentRange=0;
+ 
+ 	/*
+ 	** Read the request
+ 	*/
+ 	count = 0;
+ 	inHeaders = 1;
+-	while(_httpd_readLine(server, buf, HTTP_MAX_LEN) > 0)
++	while(server->clients->readLine((const int) server->clientSock, (char*) buf, (int)HTTP_MAX_LEN) > 0)
+ 	{
+ 		count++;
+ 
+@@ -413,21 +366,14 @@
+ 			cp = cp2 = buf;
+ 			while(isalpha(*cp2))
+ 				cp2++;
+-			*cp2 = 0;
+-			if (strcasecmp(cp,"GET") == 0)
++			*cp2 = 0; 
++			if (strncasecmp(cp,"GET",3) == 0)
+ 				server->request.method = HTTP_GET;
+-			if (strcasecmp(cp,"POST") == 0)
+-				server->request.method = HTTP_POST;
+ 			if (server->request.method == 0)
+ 			{
+-				_httpd_net_write( server->clientSock,
+-				      HTTP_METHOD_ERROR,
+-				      strlen(HTTP_METHOD_ERROR));
+-				_httpd_net_write( server->clientSock, cp, 
+-				      strlen(cp));
+-				_httpd_writeErrorLog(server,LEVEL_ERROR, 
+-					"Invalid method received");
+-				return(-1);
++				_httpd_send501(server);
++				_httpd_writeErrorLog(server,LEVEL_ERROR, "Invalid method received:");
++				_httpd_writeErrorLog(server,LEVEL_ERROR, cp);				return(-1);
+ 			}
+ 			cp = cp2+1;
+ 			while(*cp == ' ')
+@@ -438,6 +384,25 @@
+ 			*cp2 = 0;
+ 			strncpy(server->request.path,cp,HTTP_MAX_URL);
+ 			_httpd_sanitiseUrl(server->request.path);
++			cp = cp2+1;
++			while(*cp == ' ' && *cp != 0)
++				cp++;
++			cp2 = cp;
++			while(*cp2 != '/' && *cp2 != 0)
++				cp2++;
++			*cp2 = 0;
++			server->request.version = 1.0;
++			if (strcasecmp(cp,"HTTP") == 0) {
++				cp = cp2+1;
++				if ( (server->request.version = strtod(cp, NULL)) == 0)
++					server->request.version = 1.0;
++			}
++			if (server->request.version > 1.1)
++			{
++				_httpd_send505(server);
++				_httpd_writeErrorLog(server,LEVEL_ERROR, "Invalid httpd version received");
++				return(-1);
++			}
+ 			continue;
+ 		}
+ 
+@@ -504,6 +469,17 @@
+ 						authBuf, HTTP_MAX_AUTH);
+ 				}
+ 			}
++			if (strncasecmp(buf,"Connection: ",12) == 0)
++			{
++				cp = index(buf,':') + 1;
++				while( isspace( *cp ) ) 
++					cp++;
++				
++				if( strncasecmp(cp,"Close",5) == 0)
++				{
++					server->request.close = true;
++				}
++			}
+ 			if (strncasecmp(buf,"Referer: ",9) == 0)
+ 			{
+ 				cp = index(buf,':') + 2;
+@@ -541,20 +517,83 @@
+ 				if(cp)
+ 					server->request.contentLength=atoi(cp);
+ 			}
++			if (strncasecmp(buf,"Accept: ",8) == 0)
++			{
++				cp = index(buf,':') + 2;
++				if(cp)
++				{
++					strncpy(server->request.accept,cp,
++						HTTP_MAX_URL);
++				}
++			}
++			if (strncasecmp(buf,"Accept-Encoding: ",17) == 0)
++			{
++				cp = index(buf,':') + 2;
++				if(cp)
++				{
++					strncpy(server->request.acceptEncoding,cp,
++						HTTP_MAX_URL);
++				}
++			}
++			if (strncasecmp(buf,"Accept-Language: ",17) == 0)
++			{
++				cp = index(buf,':') + 2;
++				if(cp)
++				{
++					strncpy(server->request.acceptLanguage,cp,
++						HTTP_MAX_URL);
++				}
++			}
++			if (strncasecmp(buf,"User-Agent: ",12) == 0)
++			{
++				cp = index(buf,':') + 2;
++				if(cp)
++				{
++					strncpy(server->request.userAgent,cp,
++						HTTP_MAX_URL);
++				}
++			}
++			if (strncasecmp(buf,"Client-DAAP-Version: ",21) == 0)
++			{
++				cp = index(buf,':') + 2;
++				if(cp)
++					server->request.daapVersion=strtol(cp,NULL,10);
++			}
++			if (strncasecmp(buf,"range: ",7) == 0)
++			{
++				// we're not parsing the 'range:' request,
++				// instead we assume a very specific (but the most common) format:
++				// range: bytes=532543-
++				cp = index(buf,'=') + 1;
++				if(cp)
++					server->request.contentRange=atoi(cp);
++			} 
+ 			continue;
+ 		}
+ 	}
+-
++	
+ 	/*
+ 	** Process and POST data
+ 	*/
++
++	/*
++	 * FIX THIS
++	 * We only support GET at the moment and we assume we don't 
++	 * get any other methods with content, because that would
++	 * get quite hairy with HTTP 1.1 pipelining.
++	 *
++	 * bottom line: pipelined commands with content throw us off 
++	 * the tracks.
++	 *
+ 	if (server->request.contentLength > 0)
+ 	{
+ 		bzero(buf, HTTP_MAX_LEN);
+-		_httpd_readBuf(server, buf, server->request.contentLength);
++		
++		server->clients->readBuf( server->clientSock, buf, server->request.contentLength);
+ 		_httpd_storeData(server, buf);
+ 		
+ 	}
++	*/
+ 
+ 	/*
+ 	** Process any URL data
+@@ -570,27 +609,38 @@
+ }
+ 
+ 
+-void httpdEndRequest(server)
+-	httpd	*server;
++void httpdSuspendRequest(
++	httpd	*server)
+ {
+ 	_httpd_freeVariables(server->variables);
+ 	server->variables = NULL;
+-	shutdown(server->clientSock,2);
+-	close(server->clientSock);
+ 	bzero(&server->request, sizeof(server->request));
+ }
+ 
+ 
+-void httpdFreeVariables(server)
+-        httpd   *server;
++void httpdEndRequest(
++	httpd	*server)
++{
++	_httpd_freeVariables(server->variables);
++	server->variables = NULL;
++//	shutdown(server->clientSock,2);
++//	close(server->clientSock);
++//	server->clients->erase(server->clientSock);
++	server->clients->finish(server->clientSock);
++	bzero(&server->request, sizeof(server->request));
++}
++
++
++void httpdFreeVariables(
++        httpd   *server)
+ {
+         _httpd_freeVariables(server->variables);
+ }
+ 
+ 
+ 
+-void httpdDumpVariables(server)
+-	httpd	*server;
++void httpdDumpVariables(
++	httpd	*server)
+ {
+ 	httpVar	*curVar,
+ 		*curVal;
+@@ -609,34 +659,34 @@
+ 	}
+ }
+ 
+-void httpdSetFileBase(server, path)
+-	httpd	*server;
+-	char	*path;
++void httpdSetFileBase(
++	httpd	*server,
++	char	*path)
+ {
+ 	strncpy(server->fileBasePath, path, HTTP_MAX_URL);
+ }
+ 
+ 
+-int httpdAddFileContent(server, dir, name, indexFlag, preload, path)
+-	httpd	*server;
++int httpdAddFileContent(
++	httpd	*server,
+ 	char	*dir,
+-		*name;
+-	int	(*preload)();
+-	int	indexFlag;
+-	char	*path;
++	char	*name,
++	int	indexFlag,
++	int	(*preload)(httpd *server),
++	char	*path)
+ {
+ 	httpDir	*dirPtr;
+ 	httpContent *newEntry;
+ 
+ 	dirPtr = _httpd_findContentDir(server, dir, HTTP_TRUE);
+-	newEntry =  malloc(sizeof(httpContent));
++	newEntry =  (httpContent*)malloc(sizeof(httpContent));
+ 	if (newEntry == NULL)
+ 		return(-1);
+ 	bzero(newEntry,sizeof(httpContent));
+ 	newEntry->name = strdup(name);
+ 	newEntry->type = HTTP_FILE;
+ 	newEntry->indexFlag = indexFlag;
+-	newEntry->preload = preload;
++	newEntry->preload = (int(*)(void*))preload;
+ 	newEntry->next = dirPtr->entries;
+ 	dirPtr->entries = newEntry;
+ 	if (*path == '/')
+@@ -647,7 +697,7 @@
+ 	else
+ 	{
+ 		/* Path relative to base path */
+-		newEntry->path = malloc(strlen(server->fileBasePath) +
++		newEntry->path = (char*) malloc(strlen(server->fileBasePath) +
+ 			strlen(path) + 2);
+ 		snprintf(newEntry->path, HTTP_MAX_URL, "%s/%s",
+ 			server->fileBasePath, path);
+@@ -657,24 +707,25 @@
+ 
+ 
+ 
+-int httpdAddWildcardContent(server, dir, preload, path)
+-	httpd	*server;
+-	char	*dir;
+-	int	(*preload)();
+-	char	*path;
++int httpdAddWildcardContent(
++	httpd	*server,
++	char	*dir,
++	int     indexflag,
++	int	(*preload)(httpd *server),
++	char	*path)
+ {
+ 	httpDir	*dirPtr;
+ 	httpContent *newEntry;
+ 
+ 	dirPtr = _httpd_findContentDir(server, dir, HTTP_TRUE);
+-	newEntry =  malloc(sizeof(httpContent));
++	newEntry = (httpContent *) malloc(sizeof(httpContent));
+ 	if (newEntry == NULL)
+ 		return(-1);
+ 	bzero(newEntry,sizeof(httpContent));
+ 	newEntry->name = NULL;
+ 	newEntry->type = HTTP_WILDCARD;
+ 	newEntry->indexFlag = HTTP_FALSE;
+-	newEntry->preload = preload;
++	newEntry->preload = (int(*)(void*)) preload;
+ 	newEntry->next = dirPtr->entries;
+ 	dirPtr->entries = newEntry;
+ 	if (*path == '/')
+@@ -685,7 +736,7 @@
+ 	else
+ 	{
+ 		/* Path relative to base path */
+-		newEntry->path = malloc(strlen(server->fileBasePath) +
++		newEntry->path = (char*)malloc(strlen(server->fileBasePath) +
+ 			strlen(path) + 2);
+ 		snprintf(newEntry->path, HTTP_MAX_URL, "%s/%s",
+ 			server->fileBasePath, path);
+@@ -696,68 +747,81 @@
+ 
+ 
+ 
+-int httpdAddCContent(server, dir, name, indexFlag, preload, function)
+-	httpd	*server;
+-	char	*dir;
+-	char	*name;
+-	int	(*preload)();
+-	void	(*function)();
++int httpdAddCContent(
++	httpd	*server,
++	char	*dir,
++	char	*name,
++	int     indexFlag,
++	int	(*preload)(httpd *server),
++	void	(*function)(httpd *server))
+ {
+ 	httpDir	*dirPtr;
+ 	httpContent *newEntry;
+ 
+-		dirPtr = _httpd_findContentDir(server, dir, HTTP_TRUE);
+-	newEntry =  malloc(sizeof(httpContent));
++	dirPtr = _httpd_findContentDir(server, dir, HTTP_TRUE);
++	newEntry = (httpContent *) malloc(sizeof(httpContent));
+ 	if (newEntry == NULL)
+ 		return(-1);
+ 	bzero(newEntry,sizeof(httpContent));
+ 	newEntry->name = strdup(name);
+ 	newEntry->type = HTTP_C_FUNCT;
+-	newEntry->indexFlag = indexFlag;
+-	newEntry->function = function;
+-	newEntry->preload = preload;
++	newEntry->indexFlag = indexFlag; 
++	newEntry->function = (void(*)(void*))function;
++	newEntry->preload = (int(*)(void*))preload;
+ 	newEntry->next = dirPtr->entries;
+ 	dirPtr->entries = newEntry;
+ 	return(0);
+ }
+ 
+ 
+-int httpdAddCWildcardContent(server, dir, preload, function)
+-	httpd	*server;
+-	char	*dir;
+-	int	(*preload)();
+-	void	(*function)();
++int httpdAddCWildcardContent(
++	httpd	*server,
++	char	*dir,
++	int	(*preload)(httpd *server),
++	void	(*function)(httpd *server))
+ {
+ 	httpDir	*dirPtr;
+ 	httpContent *newEntry;
+ 
+ 	dirPtr = _httpd_findContentDir(server, dir, HTTP_TRUE);
+-	newEntry =  malloc(sizeof(httpContent));
++	newEntry = (httpContent*) malloc(sizeof(httpContent));
+ 	if (newEntry == NULL)
+ 		return(-1);
+ 	bzero(newEntry,sizeof(httpContent));
+ 	newEntry->name = NULL;
+ 	newEntry->type = HTTP_C_WILDCARD;
+-	newEntry->indexFlag = HTTP_FALSE;
+-	newEntry->function = function;
+-	newEntry->preload = preload;
++	newEntry->indexFlag = HTTP_TRUE;
++	newEntry->function = (void(*)(void*))function;
++	newEntry->preload = (int(*)(void*))preload;
+ 	newEntry->next = dirPtr->entries;
+ 	dirPtr->entries = newEntry;
+ 	return(0);
+ }
+ 
+-int httpdAddStaticContent(server, dir, name, indexFlag, preload, data)
+-	httpd	*server;
+-	char	*dir;
+-	char	*name;
+-	int	(*preload)();
+-	char	*data;
++
++void httpdAddCSiteContent(
++	httpd	*server,
++	void	(*function)(httpd *server, void *data),
++	void	*data)
++{
++	server->siteFunction = function;
++	server->callbackData = data;
++}
++
++
++int httpdAddStaticContent(
++	httpd	*server,
++	char	*dir,
++	char	*name,
++	int	indexFlag,
++	int	(*preload)(httpd *server),
++	char	*data)
+ {
+ 	httpDir	*dirPtr;
+ 	httpContent *newEntry;
+ 
+ 	dirPtr = _httpd_findContentDir(server, dir, HTTP_TRUE);
+-	newEntry =  malloc(sizeof(httpContent));
++	newEntry = (httpContent *)malloc(sizeof(httpContent));
+ 	if (newEntry == NULL)
+ 		return(-1);
+ 	bzero(newEntry,sizeof(httpContent));
+@@ -765,46 +829,65 @@
+ 	newEntry->type = HTTP_STATIC;
+ 	newEntry->indexFlag = indexFlag;
+ 	newEntry->data = data;
+-	newEntry->preload = preload;
++	newEntry->preload = (int(*)(void*))preload;
+ 	newEntry->next = dirPtr->entries;
+ 	dirPtr->entries = newEntry;
+ 	return(0);
+ }
+ 
+-void httpdSendHeaders(server)
+-	httpd	*server;
++void httpdSend204(
++	httpd	*server)
+ {
+-	_httpd_sendHeaders(server, 0, 0);
++	_httpd_send204(server);
+ }
+ 
+-void httpdSetResponse(server, msg)
+-	httpd	*server;
+-	char	*msg;
++void httpdSend400(
++	httpd	*server)
++{
++	_httpd_send400(server);
++}
++
++void httpdSend403(
++	httpd	*server)
++{
++	_httpd_send403(server);
++}
++
++void httpdSendHeaders(
++	httpd	*server,
++	int 	len)
++{
++	_httpd_sendHeaders(server, len, 0, 0);
++}
++
++void httpdSetResponse(
++	httpd	*server,
++	char	*msg)
+ {
+ 	strncpy(server->response.response, msg, HTTP_MAX_URL);
+ }
+ 
+-void httpdSetContentType(server, type)
+-	httpd	*server;
+-	char	*type;
++void httpdSetContentType(
++	httpd	*server,
++	char	*type)
+ {
+ 	strcpy(server->response.contentType, type);
+ }
+ 
+ 
+-void httpdAddHeader(server, msg)
+-	httpd	*server;
+-	char	*msg;
++void httpdAddHeader(
++	httpd	*server,
++	char	*msg)
+ {
+ 	strcat(server->response.headers,msg);
+ 	if (msg[strlen(msg) - 1] != '\n')
+-		strcat(server->response.headers,"\n");
++		strcat(server->response.headers,"\015\n");
+ }
+ 
+-void httpdSetCookie(server, name, value)
+-	httpd	*server;
++void httpdSetCookie(
++	httpd	*server,
+ 	char	*name,
+-		*value;
++	char	*value)
+ {
+ 	char	buf[HTTP_MAX_URL];
+ 
+@@ -812,9 +895,19 @@
+ 	httpdAddHeader(server,buf);
+ }
+ 
+-void httpdOutput(server, msg)
+-	httpd	*server;
+-	char	*msg;
++void httpdWrite(
++	httpd	*server,
++	char	*msg,
++	int 	len)
++{
++	server->response.responseLength += len;
++	httpdSendHeaders(server, len);
++	server->clients->doWrite( server->clientSock, msg, len);
++}
++
++void httpdOutput(
++	httpd	*server,
++	char	*msg)
+ {
+ 	char	buf[HTTP_MAX_LEN],
+ 		varName[80],
+@@ -866,10 +959,17 @@
+ 	*dest = 0;
+ 	server->response.responseLength += strlen(buf);
+ 	if (server->response.headersSent == 0)
+-		httpdSendHeaders(server);
+-	_httpd_net_write( server->clientSock, buf, strlen(buf));
++		httpdSendHeaders(server, strlen(buf));
++	server->clients->doWrite( server->clientSock, buf, strlen(buf));
+ }
+ 
++void httpdSendFile( 
++	httpd 	*server,
++	char 	*path,
++	int	skip = 0)
++{
++	_httpd_sendFile(server, path, skip);
++}
+ 
+ 
+ #ifdef HAVE_STDARG_H
+@@ -893,24 +993,24 @@
+         fmt = (char *) va_arg(args, char *);
+ #endif
+ 	if (server->response.headersSent == 0)
+-		httpdSendHeaders(server);
++		httpdSendHeaders(server, strlen(buf));
+ 	vsnprintf(buf, HTTP_MAX_LEN, fmt, args);
+ 	server->response.responseLength += strlen(buf);
+-	_httpd_net_write( server->clientSock, buf, strlen(buf));
++	server->clients->doWrite( server->clientSock, buf, strlen(buf));
+ }
+ 
+ 
+ 
+ 
+-void httpdProcessRequest(server)
+-	httpd	*server;
++void httpdProcessRequest(
++	httpd	*server)
+ {
+ 	char	dirName[HTTP_MAX_URL],
+ 		entryName[HTTP_MAX_URL],
+ 		*cp;
+ 	httpDir	*dir;
+ 	httpContent *entry;
+-
++	
+ 	server->response.responseLength = 0;
+ 	strncpy(dirName, httpdRequestPath(server), HTTP_MAX_URL);
+ 	cp = rindex(dirName, '/');
+@@ -924,6 +1024,13 @@
+ 		*cp = 0;
+ 	else
+ 		*(cp+1) = 0;
++
++	if( server->siteFunction != NULL) {
++		(server->siteFunction)(server, server->callbackData);
++		_httpd_writeAccessLog(server);
++		return;
++	}
++	
+ 	dir = _httpd_findContentDir(server, dirName, HTTP_FALSE);
+ 	if (dir == NULL)
+ 	{
+@@ -958,7 +1065,7 @@
+ 			break;
+ 
+ 		case HTTP_FILE:
+-			_httpd_sendFile(server, entry->path);
++			_httpd_sendFile(server, entry->path, server->request.contentRange);
+ 			break;
+ 
+ 		case HTTP_WILDCARD:
+@@ -971,46 +1078,48 @@
+ 	_httpd_writeAccessLog(server);
+ }
+ 
+-void httpdSetAccessLog(server, fp)
+-	httpd	*server;
+-	FILE	*fp;
++void httpdSetAccessLog(
++	httpd	*server,
++	FILE	*fp)
+ {
+ 	server->accessLog = fp;
+ }
+ 
+-void httpdSetErrorLog(server, fp)
+-	httpd	*server;
+-	FILE	*fp;
++void httpdSetErrorLog(
++	httpd	*server,
++	FILE	*fp)
+ {
+ 	server->errorLog = fp;
+ }
+ 
+-void httpdAuthenticate(server, realm)
+-	httpd	*server;
+-	char	*realm;
++int httpdAuthenticate(
++	httpd	*server,
++	char	*realm)
+ {
+ 	char	buffer[255];
+ 
+ 	if (server->request.authLength == 0)
+ 	{
+-		httpdSetResponse(server, "401 Please Authenticate");
++		httpdSetResponse(server, "401 Please Authenticate\015\n");
+ 		snprintf(buffer,sizeof(buffer), 
+-			"WWW-Authenticate: Basic realm=\"%s\"\n", realm);
++			"WWW-Authenticate: Basic realm=\"%s\"\015\n", realm);
+ 		httpdAddHeader(server, buffer);
+ 		httpdOutput(server,"\n");
+ 	}
++	return server->request.authLength;
+ }
+ 
+ 
+-void httpdForceAuthenticate(server, realm)
+-	httpd	*server;
+-	char	*realm;
++int httpdForceAuthenticate(
++	httpd	*server,
++	char	*realm)
+ {
+ 	char	buffer[255];
+ 
+-	httpdSetResponse(server, "401 Please Authenticate");
++	httpdSetResponse(server, "401 Please Authenticate\015\n");
+ 	snprintf(buffer,sizeof(buffer), 
+-		"WWW-Authenticate: Basic realm=\"%s\"\n", realm);
++		"WWW-Authenticate: Basic realm=\"%s\"\015\n", realm);
+ 	httpdAddHeader(server, buffer);
+ 	httpdOutput(server,"\n");
++	return server->request.authLength;
+ }
+diff -urN libhttpd-1.3/src/httpd.h libhttpd-1.3-persistent-e/src/httpd.h
+--- libhttpd-1.3/src/httpd.h	2002-11-24 19:15:51.000000000 -0700
++++ libhttpd-1.3-persistent-e/src/httpd.h	2003-08-21 17:49:39.000000000 -0600
+@@ -2,6 +2,8 @@
+ ** Copyright (c) 2002  Hughes Technologies Pty Ltd.  All rights
+ ** reserved.
+ **
++** Copyright (c) 2003  deleet, Alexander Oberdoerster
++**
+ ** Terms under which this software may be used or copied are
+ ** provided in the  specific license associated with this product.
+ **
+@@ -14,7 +16,7 @@
+ ** connection with the use or performance of this software.
+ **
+ **
+-** $Id$
++** $Id$
+ **
+ */
+ 
+@@ -41,11 +43,10 @@
+ #endif
+ 
+ #ifdef __cplusplus
+-extern "C" {
++// extern "C" {
+ #endif
+ 
+ 
+-
+ /***********************************************************************
+ ** Macro Definitions
+ */
+@@ -69,17 +70,29 @@
+ 
+ #define	HTTP_FILE		1
+ #define HTTP_C_FUNCT		2
+-#define HTTP_EMBER_FUNCT	3
++#define HTTP_MEMBER_FUNCT	3
+ #define HTTP_STATIC		4
+ #define HTTP_WILDCARD		5
+ #define HTTP_C_WILDCARD		6
+ 
+-#define HTTP_METHOD_ERROR "\n<B>ERROR : Method Not Implemented</B>\n\n"
++#define HTTP_403_RESPONSE "<HTML><HEAD><TITLE>403 Permission Denied</TITLE></HEAD>\n<BODY><H1>Access to the request URL was denied!</H1>\n"
++#define HTTP_404_RESPONSE "<HTML><HEAD><TITLE>404 Not Found</TITLE></HEAD>\n<BODY><H1>The request URL was not found!</H1>\n</BODY></HTML>\n"
++#define HTTP_501_RESPONSE "<HTML><HEAD><TITLE>501 Not Implemented</TITLE></HEAD>\n<BODY><H1>Method Not Implemented</H1>\n"
++#define HTTP_505_RESPONSE "<HTML><HEAD><TITLE>505 HTTP Version Not Supported</TITLE></HEAD>\n<BODY><H1>HTTP Version Not Supported</H1>\n"
++
+ 
+ #define httpdRequestMethod(s) 		s->request.method
+ #define httpdRequestPath(s)		s->request.path
+ #define httpdRequestContentType(s)	s->request.contentType
+ #define httpdRequestContentLength(s)	s->request.contentLength
++#define httpdRequestAcceptEncoding(s)	s->request.acceptEncoding
++#define httpdRequestAcceptLanguage(s)	s->request.acceptLanguage
++#define httpdRequestAccept(s)		s->request.accept
++#define httpdRequestUserAgent(s)	s->request.userAgent
++#define httpdRequestClose(s)		s->request.close
++#define httpdRequestVersion(s)		s->request.version
++#define httpdRequestDaapVersion(s)	s->request.daapVersion
++#define httpdRequestContentRange(s)	s->request.contentRange
+ 
+ #define HTTP_ACL_PERMIT		1
+ #define HTTP_ACL_DENY		2
+@@ -96,12 +109,19 @@
+ typedef	struct {
+ 	int	method,
+ 		contentLength,
+-		authLength;
++		authLength,
++		close,
++		contentRange;
++	double	daapVersion,
++		version;
+ 	char	path[HTTP_MAX_URL],
+ 		userAgent[HTTP_MAX_URL],
+ 		referer[HTTP_MAX_URL],
+ 		ifModified[HTTP_MAX_URL],
+ 		contentType[HTTP_MAX_URL],
++		acceptEncoding[HTTP_MAX_URL],
++		acceptLanguage[HTTP_MAX_URL],
++		accept[HTTP_MAX_URL],
+ 		authUser[HTTP_MAX_AUTH],
+ 		authPassword[HTTP_MAX_AUTH];
+ } httpReq;
+@@ -118,10 +138,10 @@
+ 	char	*name;
+ 	int	type,
+ 		indexFlag;
+-	void	(*function)();
++	void	(*function)(void *);
+ 	char	*data,
+ 		*path;
+-	int	(*preload)();
++	int	(*preload)(void *);
+ 	struct	_httpd_content 	*next;
+ } httpContent;
+ 
+@@ -150,8 +170,9 @@
+         struct  ip_acl_s *next;
+ } httpAcl;
+ 
++class Clients; 
+ 
+-typedef struct {
++struct httpd {
+ 	int	port,
+ 		serverSock,
+ 		clientSock,
+@@ -162,6 +183,7 @@
+ 		readBuf[HTTP_READ_BUF_LEN + 1],
+ 		*host,
+ 		*readBufPtr;
++	Clients	*clients;
+ 	httpReq	request;
+ 	httpRes response;
+ 	httpVar	*variables;
+@@ -169,7 +191,9 @@
+ 	httpAcl	*defaultAcl;
+ 	FILE	*accessLog,
+ 		*errorLog;
+-} httpd;
++	void	(*siteFunction)(httpd *server, void *data);
++	void 	*callbackData;
++}; 
+ 
+ 
+ 
+@@ -178,11 +202,12 @@
+ */
+ 
+ 
+-int httpdAddCContent __ANSI_PROTO((httpd*,char*,char*,int,int(*)(),void(*)()));
+-int httpdAddFileContent __ANSI_PROTO((httpd*,char*,char*,int,int(*)(),char*));
+-int httpdAddStaticContent __ANSI_PROTO((httpd*,char*,char*,int,int(*)(),char*));
+-int httpdAddWildcardContent __ANSI_PROTO((httpd*,char*,int(*)(),char*));
+-int httpdAddCWildcardContent __ANSI_PROTO((httpd*,char*,int(*)(),void(*)()));
++int httpdAddCContent __ANSI_PROTO((httpd*,char*,char*,int,int(*)(httpd *),void(*)(httpd *)));
++int httpdAddFileContent __ANSI_PROTO((httpd*,char*,char*,int,int(*)(httpd *),char*));
++int httpdAddStaticContent __ANSI_PROTO((httpd*,char*,char*,int,int(*)(httpd *),char*));
++int httpdAddWildcardContent __ANSI_PROTO((httpd*,char*,int(*)(httpd *),char*));
++int httpdAddCWildcardContent __ANSI_PROTO((httpd*,char*,int(*)(httpd *),void(*)(httpd *)));
++void httpdAddCSiteContent __ANSI_PROTO((httpd*,void(*)(httpd *,void *),void*));
+ int httpdAddVariable __ANSI_PROTO((httpd*,char*, char*));
+ int httpdGetConnection __ANSI_PROTO((httpd*, struct timeval*));
+ int httpdReadRequest __ANSI_PROTO((httpd*));
+@@ -194,15 +219,21 @@
+ void httpdAddHeader __ANSI_PROTO((httpd*, char*));
+ void httpdSetContentType __ANSI_PROTO((httpd*, char*));
+ void httpdSetResponse __ANSI_PROTO((httpd*, char*));
++void httpdSuspendRequest __ANSI_PROTO((httpd*));
+ void httpdEndRequest __ANSI_PROTO((httpd*));
+ 
+-httpd *httpdCreate __ANSI_PROTO(());
++httpd *httpdCreate __ANSI_PROTO((char*, int));
+ void httpdFreeVariables __ANSI_PROTO((httpd*));
+ void httpdDumpVariables __ANSI_PROTO((httpd*));
++void httpdWrite __ANSI_PROTO((httpd*, char*, int));
+ void httpdOutput __ANSI_PROTO((httpd*, char*));
+ void httpdPrintf __ANSI_PROTO((httpd*, char*, ...));
++void httpdSendFile __ANSI_PROTO((httpd *, char *, int));
+ void httpdProcessRequest __ANSI_PROTO((httpd*));
+-void httpdSendHeaders __ANSI_PROTO((httpd*));
++void httpdSend204 __ANSI_PROTO((httpd*));
++void httpdSend400 __ANSI_PROTO((httpd*));
++void httpdSend403 __ANSI_PROTO((httpd*));
++void httpdSendHeaders __ANSI_PROTO((httpd*, int, int, int));
+ void httpdSetFileBase __ANSI_PROTO((httpd*, char*));
+ void httpdSetCookie __ANSI_PROTO((httpd*, char*, char*));
+ 
+@@ -217,14 +248,17 @@
+ 
+ httpAcl *httpdAddAcl __ANSI_PROTO((httpd*, httpAcl*, char*, int));
+ 
++int httpdAuthenticate __ANSI_PROTO((httpd*, char*));
++int httpdForceAuthenticate __ANSI_PROTO((httpd*, char*));
++
++int httpdSelectLoop( httpd *server, struct timeval& timeout_ );
+ 
+ /***********************************************************************
+ ** Standard header file footer.  
+ */
+ 
+ #ifdef __cplusplus
+-	}
++//}
+ #endif /* __cplusplus */
+ #endif /* file inclusion */
+ 
+-
+diff -urN libhttpd-1.3/src/httpd_priv.h libhttpd-1.3-persistent-e/src/httpd_priv.h
+--- libhttpd-1.3/src/httpd_priv.h	2002-11-24 19:15:51.000000000 -0700
++++ libhttpd-1.3-persistent-e/src/httpd_priv.h	2003-08-21 17:49:39.000000000 -0600
+@@ -2,6 +2,8 @@
+ ** Copyright (c) 2002  Hughes Technologies Pty Ltd.  All rights
+ ** reserved.
+ **
++** Copyright (c) 2003  deleet, Alexander Oberdoerster
++**
+ ** Terms under which this software may be used or copied are
+ ** provided in the  specific license associated with this product.
+ **
+@@ -14,7 +16,7 @@
+ ** connection with the use or performance of this software.
+ **
+ **
+-** $Id$
++** $Id$
+ **
+ */
+ 
+@@ -41,7 +43,7 @@
+ #endif
+ 
+ #ifdef __cplusplus
+-extern "C" {
++//extern "C" {
+ #endif
+ 
+ 
+@@ -53,21 +55,28 @@
+ char _httpd_from_hex  __ANSI_PROTO((char));
+ 
+ 
+-void _httpd_catFile __ANSI_PROTO((httpd*, char*));
++void _httpd_catFile __ANSI_PROTO((httpd*, char*, int));
++void _httpd_send204 __ANSI_PROTO((httpd*));
++void _httpd_send304 __ANSI_PROTO((httpd*));
++void _httpd_send400 __ANSI_PROTO((httpd*));
+ void _httpd_send403 __ANSI_PROTO((httpd*));
+ void _httpd_send404 __ANSI_PROTO((httpd*));
++void _httpd_send501 __ANSI_PROTO((httpd*));
++void _httpd_send505 __ANSI_PROTO((httpd*));
+ void _httpd_sendText __ANSI_PROTO((httpd*, char*));
+-void _httpd_sendFile __ANSI_PROTO((httpd*, char*));
++void _httpd_sendFile __ANSI_PROTO((httpd*, char*, int));
+ void _httpd_sendStatic __ANSI_PROTO((httpd*, char*));
+-void _httpd_sendHeaders __ANSI_PROTO((httpd*, int,int);)
++void _httpd_sendHeaders __ANSI_PROTO((httpd*, int, int, int);)
+ void _httpd_sanitiseUrl __ANSI_PROTO((char*));
+ void _httpd_freeVariables __ANSI_PROTO((httpVar*));
+ void _httpd_formatTimeString __ANSI_PROTO((httpd*, char*, int));
+ void _httpd_storeData __ANSI_PROTO((httpd*, char*));
+ void _httpd_writeAccessLog __ANSI_PROTO((httpd*));
+ void _httpd_writeErrorLog __ANSI_PROTO((httpd*, char*, char*));
++int _httpd_decode  __ANSI_PROTO((char *bufcoded,char *bufplain,int outbufsize));
+ 
+ 
++int _httpd_setnonblocking __ANSI_PROTO((int));
+ int _httpd_net_read __ANSI_PROTO((int, char*, int));
+ int _httpd_net_write __ANSI_PROTO((int, char*, int));
+ int _httpd_readBuf __ANSI_PROTO((httpd*, char*, int));
+@@ -79,4 +88,8 @@
+ httpContent *_httpd_findContentEntry __ANSI_PROTO((httpd*, httpDir*, char*));
+ httpDir *_httpd_findContentDir __ANSI_PROTO((httpd*, char*, int));
+ 
++#ifdef __cplusplus
++//}
++#endif
++
+ #endif  /* LIB_HTTPD_PRIV_H */
+diff -urN libhttpd-1.3/src/ip_acl.c libhttpd-1.3-persistent-e/src/ip_acl.c
+--- libhttpd-1.3/src/ip_acl.c	2002-11-24 19:15:51.000000000 -0700
++++ libhttpd-1.3-persistent-e/src/ip_acl.c	2003-08-21 17:49:39.000000000 -0600
+@@ -14,7 +14,7 @@
+ ** connection with the use or performance of this software.
+ **
+ **
+-** $Id$
++** $Id$
+ **
+ */
+ 
+@@ -23,6 +23,7 @@
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
++#include <strings.h>
+ 
+ #if defined(_WIN32)
+ #else
+@@ -42,10 +43,10 @@
+ ** PRIVATE ROUTINES
+ **************************************************************************/
+ 
+-static int scanCidr(val, result, length)
+-	char	*val;
++static int scanCidr(
++	char	*val,
+ 	u_int	*result,
+-		*length;
++	u_int	*length)
+ {
+ 	u_int	res, res1, res2, res3, res4, res5;
+ 	char	*cp;
+@@ -89,10 +90,12 @@
+ }
+ 
+ 
+-static int _isInCidrBlock(server, addr1, len1, addr2, len2)
+-	httpd	*server;
+-	int	addr1, len1,
+-		addr2, len2;
++static int _isInCidrBlock(
++	httpd	*server,
++	int	addr1, 
++	int	len1,
++	int	addr2, 
++	int	len2)
+ {
+ 	int	count,
+ 		mask;
+@@ -131,11 +134,11 @@
+ ** PUBLIC ROUTINES
+ **************************************************************************/
+ 
+-httpAcl *httpdAddAcl(server, acl, cidr, action)
+-	httpd	*server;
+-	httpAcl	*acl;
+-        char	*cidr;
+-	int	action;
++httpAcl *httpdAddAcl(
++	httpd	*server,
++	httpAcl	*acl,
++        char	*cidr,
++	int	action)
+ {
+ 	httpAcl	*cur;
+ 	int	addr,
+@@ -144,7 +147,7 @@
+ 	/*
+ 	** Check the ACL info is reasonable
+ 	*/
+-	if(scanCidr(cidr, &addr, &len) < 0)
++	if(scanCidr(cidr, (u_int*)&addr, (u_int*)&len) < 0)
+ 	{
+ 		_httpd_writeErrorLog(server,LEVEL_ERROR,
+ 			"Invalid IP address format");
+@@ -187,9 +190,9 @@
+ }
+ 
+ 
+-int httpdCheckAcl(server, acl)
+-	httpd	*server;
+-	httpAcl	*acl;
++int httpdCheckAcl(
++	httpd	*server,
++	httpAcl	*acl)
+ {
+ 	httpAcl	*cur;
+ 	int	addr, len,
+@@ -198,7 +201,7 @@
+ 
+ 
+ 	action = HTTP_ACL_DENY;
+-	scanCidr(server->clientAddr, &addr, &len);
++	scanCidr(server->clientAddr, (u_int*)&addr, (u_int*)&len);
+ 	cur = acl;
+ 	while(cur)
+ 	{
+@@ -220,9 +223,9 @@
+ }
+ 
+ 
+-void httpdSetDefaultAcl(server, acl)
+-	httpd	*server;
+-	httpAcl	*acl;
++void httpdSetDefaultAcl(
++	httpd	*server,
++	httpAcl	*acl)
+ {
+ 	server->defaultAcl = acl;
+ }
+diff -urN libhttpd-1.3/src/Makefile.tmpl libhttpd-1.3-persistent-e/src/Makefile.tmpl
+--- libhttpd-1.3/src/Makefile.tmpl	2002-10-09 23:04:10.000000000 -0600
++++ libhttpd-1.3-persistent-e/src/Makefile.tmpl	2003-08-21 17:49:39.000000000 -0600
+@@ -1,3 +1,3 @@
+-!library_unix libhttpd.a protocol.c,api.c,version.c,ip_acl.c
++!library_unix libhttpd.a protocol.c,api.c,version.c,ip_acl.c,select.c
+ !libinstall libhttpd.a /usr/local/lib/libhttpd.a 744 $(ROOT)
+ !install httpd.h /usr/local/include/httpd.h 744 $(ROOT)
+diff -urN libhttpd-1.3/src/protocol.c libhttpd-1.3-persistent-e/src/protocol.c
+--- libhttpd-1.3/src/protocol.c	2002-11-24 19:15:51.000000000 -0700
++++ libhttpd-1.3-persistent-e/src/protocol.c	2003-08-21 17:37:17.000000000 -0600
+@@ -14,7 +14,7 @@
+ ** connection with the use or performance of this software.
+ **
+ **
+-** $Id$
++** $Id$
+ **
+ */
+ 
+@@ -24,6 +24,7 @@
+ #include <ctype.h>
+ #include <sys/types.h>
+ #include <sys/stat.h>
++#include <fcntl.h>
+ #include <time.h>
+ 
+ #if defined(_WIN32) 
+@@ -32,15 +33,19 @@
+ #include <sys/file.h>
+ #endif
+ 
++#ifdef __sgi__
++#include <snprintf.h>
++#endif
++
+ #include "config.h"
++#include "select.h"
+ #include "httpd.h"
+ #include "httpd_priv.h"
+ 
+-
+-int _httpd_net_read(sock, buf, len)
+-	int	sock;
+-	char	*buf;
+-	int	len;
++int _httpd_net_read(
++	int	sock,
++	char	*buf,
++	int	len)
+ {
+ #if defined(_WIN32) 
+ 	return( recv(sock, buf, len, 0));
+@@ -49,11 +54,10 @@
+ #endif
+ }
+ 
+-
+-int _httpd_net_write(sock, buf, len)
+-	int	sock;
+-	char	*buf;
+-	int	len;
++int _httpd_net_write(
++	int	sock,
++	char	*buf,
++	int	len)
+ {
+ #if defined(_WIN32) 
+ 	return( send(sock, buf, len, 0));
+@@ -62,9 +66,26 @@
+ #endif
+ }
+ 
+-int _httpd_readChar(server, cp)
+-	httpd	*server;
+-	char	*cp;
++int _httpd_setnonblocking(
++	const int desc)
++{
++	int opts = fcntl(desc, F_GETFL);
++	if (opts < 0) {
++		perror( "(fcntl(F_GETFL))" );
++		return -1;
++	}
++
++	opts = (opts | O_NONBLOCK);
++	if (fcntl(desc, F_SETFL,opts) < 0) {
++		perror( "(fcntl(F_SETFL))" );
++		return -1;
++	}
++	return 0;
++}
++
++int _httpd_readChar(
++	httpd	*server,
++	char	*cp)
+ {
+ 	if (server->readBufRemain == 0)
+ 	{
+@@ -82,10 +103,10 @@
+ }
+ 
+ 
+-int _httpd_readLine(server, destBuf, len)
+-	httpd	*server;
+-	char	*destBuf;
+-	int	len;
++int _httpd_readLine(
++	httpd	*server,
++	char	*destBuf,
++	int	len)
+ {
+ 	char	curChar,
+ 		*dst;
+@@ -118,10 +139,10 @@
+ }
+ 
+ 
+-int _httpd_readBuf(server, destBuf, len)
+-	httpd	*server;
+-	char	*destBuf;
+-	int	len;
++int _httpd_readBuf(
++	httpd	*server,
++	char	*destBuf,
++	int	len)
+ {
+ 	char	curChar,
+ 		*dst;
+@@ -140,8 +161,8 @@
+ 	return(1);
+ }
+ 
+-void _httpd_writeAccessLog(server)
+-	httpd	*server;
++void _httpd_writeAccessLog(
++	httpd	*server)
+ {
+ 	char	dateBuf[30];
+ 	struct 	tm *timePtr;
+@@ -155,16 +176,16 @@
+ 	timePtr = localtime(&clock);
+ 	strftime(dateBuf, 30, "%d/%b/%Y:%T %Z",  timePtr);
+ 	responseCode = atoi(server->response.response);
+-	fprintf(server->accessLog, "%s - - [%s] %s \"%s\" %d %d\n", 
++	fprintf(server->accessLog, "%s - - [%s] %s \"%s\" HTTP/%1.1f %d %d\n", 
+ 		server->clientAddr, dateBuf, httpdRequestMethodName(server), 
+-		httpdRequestPath(server), responseCode, 
++		httpdRequestPath(server), httpdRequestVersion(server), responseCode, 
+ 		server->response.responseLength);
+ }
+ 
+-void _httpd_writeErrorLog(server, level, message)
+-	httpd	*server;
++void _httpd_writeErrorLog(
++	httpd	*server,
+ 	char	*level,
+-		*message;
++	char	*message)
+ {
+ 	char	dateBuf[30];
+ 	struct 	tm *timePtr;
+@@ -190,10 +211,10 @@
+ 
+ 
+ 
+-int _httpd_decode (bufcoded, bufplain, outbufsize)
+-	char *		bufcoded;
+-	char *		bufplain;
+-	int		outbufsize;
++int _httpd_decode (
++	char *		bufcoded,
++	char *		bufplain,
++	int		outbufsize)
+ {
+ 	static char six2pr[64] = {
+     		'A','B','C','D','E','F','G','H','I','J','K','L','M',
+@@ -213,7 +234,7 @@
+ 
+ 	int nbytesdecoded, j;
+ 	register char *bufin = bufcoded;
+-	register unsigned char *bufout = bufplain;
++	register unsigned char *bufout = (unsigned char*) bufplain;
+ 	register int nprbytes;
+ 
+ 	/*
+@@ -271,16 +292,16 @@
+ 
+ 
+ 
+-char _httpd_from_hex (c)
+-        char    c;
++char _httpd_from_hex (
++        char    c)
+ {
+     return  c >= '0' && c <= '9' ?  c - '0'
+             : c >= 'A' && c <= 'F'? c - 'A' + 10
+             : c - 'a' + 10;     /* accept small letters just in case */
+ }
+ 
+-char * _httpd_unescape(str)
+-        char    *str;
++char * _httpd_unescape(
++        char    *str)
+ {
+     char * p = str;
+     char * q = str;
+@@ -309,8 +330,8 @@
+ } 
+ 
+ 
+-void _httpd_freeVariables(var)
+-	httpVar	*var;
++void _httpd_freeVariables(
++	httpVar	*var)
+ {
+ 	httpVar	*curVar, *lastVar;
+ 
+@@ -330,9 +351,9 @@
+ 	return;
+ }
+ 
+-void _httpd_storeData(server, query)
+-	httpd	*server;
+-        char    *query;
++void _httpd_storeData(
++	httpd	*server,
++        char    *query)
+ {
+         char    *cp,
+ 		*cp2,
+@@ -390,10 +411,10 @@
+ }
+ 
+ 
+-void _httpd_formatTimeString(server, ptr, clock)
+-	httpd	*server;
+-	char	*ptr;
+-	int	clock;
++void _httpd_formatTimeString(
++	httpd	*server,
++	char	*ptr,
++	int	clock)
+ {
+ 	struct 	tm *timePtr;
+ 
+@@ -404,54 +425,71 @@
+ }
+ 
+ 
+-void _httpd_sendHeaders(server, contentLength, modTime)
+-	httpd	*server;
+-	int	contentLength,
+-		modTime;
++void _httpd_sendHeaders(
++	httpd	*server,
++	int	contentLength = 0,
++	int	modTime = 0,
++	int	skip = 0)
+ {
+-	char	tmpBuf[80],
++	char	tmpBuf[255],
+ 		timeBuf[HTTP_TIME_STRING_LEN];
+ 
+ 	if(server->response.headersSent)
+ 		return;
+ 
+ 	server->response.headersSent = 1;
+-	_httpd_net_write(server->clientSock, "HTTP/1.0 ", 9);
+-	_httpd_net_write(server->clientSock, server->response.response, 
++	
++	if( server->request.version <= 1.0 ) {
++		server->clients->doWrite(server->clientSock, "HTTP/1.0 ", 9);
++	} else {
++		server->clients->doWrite(server->clientSock, "HTTP/1.1 ", 9);
++	}
++	server->clients->doWrite(server->clientSock, server->response.response, 
+ 		strlen(server->response.response));
+-	_httpd_net_write(server->clientSock, server->response.headers, 
++	server->clients->doWrite(server->clientSock, server->response.headers, 
+ 		strlen(server->response.headers));
+ 
+ 	_httpd_formatTimeString(server, timeBuf, 0);
+-	_httpd_net_write(server->clientSock,"Date: ", 6);
+-	_httpd_net_write(server->clientSock, timeBuf, strlen(timeBuf));
+-	_httpd_net_write(server->clientSock, "\n", 1);
+-
+-	_httpd_net_write(server->clientSock, "Connection: close\n", 18);
+-	_httpd_net_write(server->clientSock, "Content-Type: ", 14);
+-	_httpd_net_write(server->clientSock, server->response.contentType, 
++	server->clients->doWrite(server->clientSock,"Date: ", 6);
++	server->clients->doWrite(server->clientSock, timeBuf, strlen(timeBuf));
++	server->clients->doWrite(server->clientSock, "\r\n", 2);
++
++	server->clients->doWrite(server->clientSock, "Content-Type: ", 14);
++	server->clients->doWrite(server->clientSock, server->response.contentType, 
+ 		strlen(server->response.contentType));
+-	_httpd_net_write(server->clientSock, "\n", 1);
++	server->clients->doWrite(server->clientSock, "\r\n", 2);
+ 
+-	if (contentLength > 0)
+-	{
+-		_httpd_net_write(server->clientSock, "Content-Length: ", 16);
+-		snprintf(tmpBuf, sizeof(tmpBuf), "%d", contentLength);
+-		_httpd_net_write(server->clientSock, tmpBuf, strlen(tmpBuf));
+-		_httpd_net_write(server->clientSock, "\n", 1);
++	server->clients->doWrite(server->clientSock, "Content-Length: ", 16);
++	snprintf(tmpBuf, sizeof(tmpBuf), "%d", contentLength);
++	server->clients->doWrite(server->clientSock, tmpBuf, strlen(tmpBuf));
++	server->clients->doWrite(server->clientSock, "\r\n", 2);
+ 
++	if (server->request.version < 1.1 || server->request.close) 
++	{
++		server->clients->doWrite(server->clientSock, "Connection: Close\r\n", 19);
++	}
++	if (modTime > 0)
++	{
+ 		_httpd_formatTimeString(server, timeBuf, modTime);
+-		_httpd_net_write(server->clientSock, "Last-Modified: ", 15);
+-		_httpd_net_write(server->clientSock, timeBuf, strlen(timeBuf));
+-		_httpd_net_write(server->clientSock, "\n", 1);
++		server->clients->doWrite(server->clientSock, "Last-Modified: ", 15);
++		server->clients->doWrite(server->clientSock, timeBuf, strlen(timeBuf));
++		server->clients->doWrite(server->clientSock, "\r\n", 2);
++	}
++	server->clients->doWrite(server->clientSock, "Accept-Ranges: bytes\r\n", 22);
++
++	if( skip != 0 ) {
++		snprintf(tmpBuf, sizeof(tmpBuf), "Content-Range: bytes %d-%d/%d\r\n", 
++			server->request.contentRange, contentLength, contentLength);
++		server->clients->doWrite(server->clientSock, tmpBuf, strlen(tmpBuf));
+ 	}
+-	_httpd_net_write(server->clientSock, "\n", 1);
++
++	server->clients->doWrite(server->clientSock, "\r\n", 2);
+ }
+ 
+-httpDir *_httpd_findContentDir(server, dir, createFlag)
+-	httpd	*server;
+-	char	*dir;
+-	int	createFlag;
++httpDir *_httpd_findContentDir(
++	httpd	*server,
++	char	*dir,
++	int	createFlag)
+ {
+ 	char	buffer[HTTP_MAX_URL],
+ 		*curDir;
+@@ -474,7 +512,7 @@
+ 		{
+ 			if (createFlag == HTTP_TRUE)
+ 			{
+-				curChild = malloc(sizeof(httpDir));
++				curChild = (httpDir*) malloc(sizeof(httpDir));
+ 				bzero(curChild, sizeof(httpDir));
+ 				curChild->name = strdup(curDir);
+ 				curChild->next = curItem->children;
+@@ -492,10 +530,10 @@
+ }
+ 
+ 
+-httpContent *_httpd_findContentEntry(server, dir, entryName)
+-	httpd	*server;
+-	httpDir	*dir;
+-	char	*entryName;
++httpContent *_httpd_findContentEntry(
++	httpd	*server,
++	httpDir	*dir,
++	char	*entryName)
+ {
+ 	httpContent *curEntry;
+ 
+@@ -517,28 +555,41 @@
+ }
+ 
+ 
+-void _httpd_send304(server)
+-	httpd	*server;
++void _httpd_send204(
++	httpd	*server)
++{
++	httpdSetResponse(server, "204 No Content\n");
++	_httpd_sendHeaders(server,0,0);
++}
++
++
++void _httpd_send304(
++	httpd	*server)
+ {
+ 	httpdSetResponse(server, "304 Not Modified\n");
+ 	_httpd_sendHeaders(server,0,0);
+ }
+ 
+ 
+-void _httpd_send403(server)
+-	httpd	*server;
++void _httpd_send400(
++	httpd	*server)
+ {
+-	httpdSetResponse(server, "403 Permission Denied\n");
++	httpdSetResponse(server, "400 Bad Request\n");
+ 	_httpd_sendHeaders(server,0,0);
+-	_httpd_sendText(server,
+-		"<HTML><HEAD><TITLE>403 Permission Denied</TITLE></HEAD>\n");
+-	_httpd_sendText(server,
+-		"<BODY><H1>Access to the request URL was denied!</H1>\n");
+ }
+ 
+ 
+-void _httpd_send404(server)
+-	httpd	*server;
++void _httpd_send403(
++	httpd	*server)
++{
++	httpdSetResponse(server, "403 Permission Denied\n");
++	_httpd_sendHeaders(server,strlen(HTTP_403_RESPONSE),0);
++	_httpd_sendText(server,HTTP_403_RESPONSE);
++}
++
++
++void _httpd_send404(
++	httpd	*server)
+ {
+ 	char	msg[HTTP_MAX_URL];
+ 
+@@ -546,18 +597,34 @@
+ 		"File does not exist: %s", server->request.path);
+ 	_httpd_writeErrorLog(server,LEVEL_ERROR, msg);
+ 	httpdSetResponse(server, "404 Not Found\n");
+-	_httpd_sendHeaders(server,0,0);
+-	_httpd_sendText(server,
+-		"<HTML><HEAD><TITLE>404 Not Found</TITLE></HEAD>\n");
+-	_httpd_sendText(server,
+-		"<BODY><H1>The request URL was not found!</H1>\n");
+-	_httpd_sendText(server, "</BODY></HTML>\n");
++	_httpd_sendHeaders(server,strlen(HTTP_404_RESPONSE),0);
++	_httpd_sendText(server,HTTP_404_RESPONSE);
+ }
+ 
+ 
+-void _httpd_catFile(server, path)
+-	httpd	*server;
+-	char	*path;
++void _httpd_send501(
++	httpd	*server)
++{
++	httpdSetResponse(server, "501 Not Implemented\n");
++	_httpd_sendHeaders(server,strlen(HTTP_501_RESPONSE),0);
++	_httpd_sendText(server,HTTP_501_RESPONSE);
++}
++
++
++void _httpd_send505(
++	httpd	*server)
++{
++	httpdSetResponse(server, "505 HTTP Version Not Supported\n");
++	_httpd_sendHeaders(server,strlen(HTTP_505_RESPONSE),0);
++	_httpd_sendText(server,HTTP_505_RESPONSE);
++}
++
++
++
++void _httpd_catFile(
++	httpd	*server,
++	char	*path,
++	int	skip)
+ {
+ 	int	fd,
+ 		len;
+@@ -566,34 +633,36 @@
+ 	fd = open(path,O_RDONLY);
+ 	if (fd < 0)
+ 		return;
++	lseek(fd, skip, SEEK_SET);
+ 	len = read(fd, buf, HTTP_MAX_LEN);
+ 	while(len > 0)
+ 	{
+ 		server->response.responseLength += len;
+-		_httpd_net_write(server->clientSock, buf, len);
++		server->clients->doWrite(server->clientSock, buf, len);
+ 		len = read(fd, buf, HTTP_MAX_LEN);
+ 	}
+ 	close(fd);
+ }
+ 
+ 
+-void _httpd_sendStatic(server, data)
+-	httpd	*server;
+-	char	*data;
++void _httpd_sendStatic(
++	httpd	*server,
++	char	*data)
+ {
+ 	if (_httpd_checkLastModified(server,server->startTime) == 0)
+ 	{
+ 		_httpd_send304(server);
+ 	}
+-	_httpd_sendHeaders(server, server->startTime, strlen(data));
++	_httpd_sendHeaders(server, strlen(data), server->startTime);
+ 	httpdOutput(server, data);
+ }
+ 
+ 
+ 
+-void _httpd_sendFile(server, path)
+-	httpd	*server;
+-	char	*path;
++void _httpd_sendFile(
++	httpd	*server,
++	char	*path,
++	int 	skip)
+ {
+ 	char	*suffix;
+ 	struct 	stat sbuf;
+@@ -621,37 +690,37 @@
+ 	}
+ 	else
+ 	{
+-		_httpd_sendHeaders(server, sbuf.st_size, sbuf.st_mtime);
+-		_httpd_catFile(server, path);
++		_httpd_sendHeaders(server, sbuf.st_size, sbuf.st_mtime, skip);
++		_httpd_catFile(server, path, skip);
+ 	}
+ }
+ 
+ 
+-int _httpd_sendDirectoryEntry(server, entry, entryName)
+-	httpd		*server;
+-	httpContent	*entry;
+-	char		*entryName;
++int _httpd_sendDirectoryEntry(
++	httpd		*server,
++	httpContent	*entry,
++	char		*entryName)
+ {
+ 	char		path[HTTP_MAX_URL];
+ 
+ 	snprintf(path, HTTP_MAX_URL, "%s/%s", entry->path, entryName);
+-	_httpd_sendFile(server,path);
++	_httpd_sendFile(server,path,0);
+ 	return(0);
+ }
+ 
+ 
+-void _httpd_sendText(server, msg)
+-	httpd	*server;
+-	char	*msg;
++void _httpd_sendText(
++	httpd	*server,
++	char	*msg)
+ {
+ 	server->response.responseLength += strlen(msg);
+-	_httpd_net_write(server->clientSock,msg,strlen(msg));
++	server->clients->doWrite(server->clientSock,msg,strlen(msg));
+ }
+ 
+ 
+-int _httpd_checkLastModified(server, modTime)
+-	httpd	*server;
+-	int	modTime;
++int _httpd_checkLastModified(
++	httpd	*server,
++	int	modTime)
+ {
+ 	char 	timeBuf[HTTP_TIME_STRING_LEN];
+ 
+@@ -682,11 +751,11 @@
+  
+ #define ACCEPTABLE(a)   ( a>=32 && a<128 && ((isAcceptable[a-32]) & mask))
+ 
+-static char *hex = "0123456789ABCDEF";
++static char *hex_ = "0123456789ABCDEF";
+ 
+ 
+-char *_httpd_escape(str)
+-        char *str;
++char *_httpd_escape(
++        char *str)
+ {
+     unsigned char mask = URL_XPALPHAS;
+     char * p;
+@@ -707,8 +776,8 @@
+         unsigned char a = *p;
+         if (!ACCEPTABLE(a)) {
+             *q++ = '%';  /* Means hex commming */
+-            *q++ = hex[a >> 4];
+-            *q++ = hex[a & 15];
++            *q++ = hex_[a >> 4];
++            *q++ = hex_[a & 15];
+         }
+         else *q++ = *p;
+     }
+@@ -718,8 +787,8 @@
+ 
+ 
+ 
+-void _httpd_sanitiseUrl(url)
+-	char	*url;
++void _httpd_sanitiseUrl(
++	char	*url)
+ {
+ 	char	*from,
+ 		*to,
+@@ -785,3 +854,4 @@
+ 	}
+ 	*to = 0;
+ }
++
+diff -urN libhttpd-1.3/src/select.c libhttpd-1.3-persistent-e/src/select.c
+--- libhttpd-1.3/src/select.c	1969-12-31 17:00:00.000000000 -0700
++++ libhttpd-1.3-persistent-e/src/select.c	2003-10-15 19:55:20.000000000 -0600
+@@ -0,0 +1,196 @@
++/*
++** Copyright (c) 2002  Hughes Technologies Pty Ltd.  All rights
++** reserved.
++**
++** Copyright (c) 2003  deleet, Alexander Oberdoerster
++**
++** Terms under which this software may be used or copied are
++** provided in the  specific license associated with this product.
++**
++** Hughes Technologies disclaims all warranties with regard to this
++** software, including all implied warranties of merchantability and
++** fitness, in no event shall Hughes Technologies be liable for any
++** special, indirect or consequential damages or any damages whatsoever
++** resulting from loss of use, data or profits, whether in an action of
++** contract, negligence or other tortious action, arising out of or in
++** connection with the use or performance of this software.
++**
++*/
++
++
++#include <stdio.h>
++#include <stdlib.h>
++#include <unistd.h>
++#include <errno.h>
++#include <signal.h>
++#include <sys/types.h>
++#include <sys/time.h>
++#include <sys/wait.h>
++#include <sys/socket.h>
++#include <sys/fcntl.h>
++#include <netdb.h>
++#include <netinet/in.h>
++#include <arpa/inet.h>
++#include <sys/param.h>
++#include <string.h>
++#include <dirent.h>
++
++#include <string>
++#include <deque>
++#include <list>
++#include <algorithm>
++#include <cctype>
++#include <iostream>
++
++#include "httpd.h"
++#include "httpd_priv.h"
++#include "select.h"
++
++
++////////
++// globals
++
++int gFinished = 0;
++int gReturn = 0;
++
++
++////////
++// select arbitration
++
++void handleSelectError( httpd *server ) 
++{
++	perror( "(select)" );
++	switch (errno) {			
++	// ignore interrupts
++	case EINTR:
++		break;
++	// die otherwise
++	default:
++		server->clients->clearWBuffers();
++		gFinished = 1;
++		gReturn = -1;
++	}
++}
++
++void handleSelectTimeout( httpd *server, const int fDesc ) 
++{
++	server->clients->erase(fDesc);
++}
++
++void handleSelectRead( httpd *server, const int fDesc ) 
++{
++	if(fDesc == server->serverSock) {
++		if ( server->clients->handleNew(server) < 0 )  
++			perror( "(accept)" );
++	} else {
++		if (server->clients->handleExisting(fDesc) > 0) {
++			server->clients->erase(fDesc);
++		} else {
++			server->clientSock = fDesc;
++                        server->clients->address(fDesc, server->clientAddr);
++			if (httpdReadRequest(server) < 0) {
++				httpdEndRequest(server);
++			} else {
++				httpdProcessRequest(server); 
++				if (server->request.version < 1.1 || server->request.close) {
++					httpdEndRequest(server);
++				} else {
++					httpdSuspendRequest(server);
++				}
++			}
++              }
++	}
++}
++
++void handleSelectWrite( httpd *server, const int fDesc ) 
++{
++	if (server->clients->handleWrite(fDesc) > 1) 
++		server->clients->erase(fDesc);
++}
++
++
++////////
++// select utility functions
++
++int getMinSocket(httpd *server)
++{
++	int minSocket;
++	
++	minSocket = (server->serverSock > server->clients->getMinSocket()) ?  
++		server->serverSock : server->clients->getMinSocket();
++	return minSocket;
++}
++
++int getMaxSocket(httpd *server)
++{
++	int maxSocket;
++	
++	maxSocket = (server->serverSock > server->clients->getMaxSocket()) ?  
++		server->serverSock : server->clients->getMaxSocket();
++	return maxSocket;
++}
++
++void calcFDRead(httpd *server, fd_set &fdRead) 
++{
++	FD_ZERO( &fdRead );
++	FD_SET( server->serverSock, &fdRead );
++	server->clients->calcFDRead(fdRead);
++}
++
++int calcFDWrite(httpd *server, fd_set &fdWrite) 
++{
++	int pendingWrites = 0;
++
++	FD_ZERO( &fdWrite );
++	pendingWrites += server->clients->calcFDWrite(fdWrite);
++	return pendingWrites;
++}
++
++
++int httpdSelectLoop( httpd *server, struct timeval& timeout_ ) {
++	timeval timeout;
++
++	// autoreap children
++	signal(SIGCHLD, SIG_IGN);
++
++	fd_set fdRead, fdWrite;
++	int minSocket, maxSocket;
++	int pendingWrites = 0;
++	int ret;
++		
++	FD_ZERO(&fdWrite);
++	
++	while( !gFinished || (pendingWrites != 0) ) {
++		timeout = timeout_;
++
++		calcFDRead(server, fdRead);
++		minSocket = getMinSocket(server);
++		maxSocket = getMaxSocket(server);
++
++		ret = select( maxSocket+1, &fdRead, &fdWrite, NULL, &timeout );
++
++		if ( ret < 0 ) {
++			// select returned an error
++			handleSelectError( server );
++		} else if (ret == 0) {
++			// timeout hit
++			for( int i = minSocket; i <= maxSocket; i++ ) 
++				if( FD_ISSET( i, &fdWrite ))
++					handleSelectTimeout(server, i);
++		} else {
++			// handle i/o
++			for( int i = minSocket; i <= maxSocket; i++ ) {
++				if( FD_ISSET( i, &fdRead )) {
++					handleSelectRead(server, i);
++				}
++				if( FD_ISSET( i, &fdWrite )) {
++					handleSelectWrite(server, i);
++				}
++			}
++		}
++
++		pendingWrites = calcFDWrite(server, fdWrite);
++	}
++
++	return gReturn;
++}
+diff -urN libhttpd-1.3/src/select.h libhttpd-1.3-persistent-e/src/select.h
+--- libhttpd-1.3/src/select.h	1969-12-31 17:00:00.000000000 -0700
++++ libhttpd-1.3-persistent-e/src/select.h	2003-10-15 19:54:02.000000000 -0600
+@@ -0,0 +1,338 @@
++/*
++** Copyright (c) 2002  Hughes Technologies Pty Ltd.  All rights
++** reserved.
++**
++** Copyright (c) 2003  deleet, Alexander Oberdoerster
++**
++** Terms under which this software may be used or copied are
++** provided in the  specific license associated with this product.
++**
++** Hughes Technologies disclaims all warranties with regard to this
++** software, including all implied warranties of merchantability and
++** fitness, in no event shall Hughes Technologies be liable for any
++** special, indirect or consequential damages or any damages whatsoever
++** resulting from loss of use, data or profits, whether in an action of
++** contract, negligence or other tortious action, arising out of or in
++** connection with the use or performance of this software.
++**
++*/
++
++#ifndef LIB_HTTPD_SELECT_H
++
++#define LIB_HTTPD_SELECT_H 1
++
++#include <sys/socket.h>
++#include <sys/fcntl.h>
++#include <netinet/in.h>
++#include <arpa/inet.h>
++#include <sys/param.h>
++#include <iostream>
++#include <strings.h>
++
++#include <vector>
++#include <list>
++#include <algorithm>
++
++#include "httpd.h"
++#include "httpd_priv.h"
++
++#ifdef __APPLE__
++	typedef int socklen_t;
++#endif
++
++#ifdef __sgi__
++	typedef int socklen_t;
++#endif
++
++#define min(a, b)       (a) < (b) ? (a) : (b)
++#define find_(a, b)	find( (a.begin()), (a.end()), (b) )
++#define erase_(a, b, c)	a.erase( (a.begin() + b), (a.begin() + c) )
++#define READBUFSIZE 10240
++
++typedef std::vector<char> BufferType;
++typedef BufferType::iterator BufferIterator;
++
++struct Client {
++	int fDesc;
++	char address[17];
++	int finished;
++	int bytesSent;
++	BufferType readBuffer;
++	BufferType writeBuffer; 
++};
++
++struct httpd;
++
++class Clients {
++protected:
++	std::list<Client> clientList;
++	typedef std::list<Client>::iterator ClientIterator;
++
++	ClientIterator locateFDesc( const int fDesc ) {
++		ClientIterator c = clientList.begin();
++		while (c != clientList.end()) {
++			if (c->fDesc == fDesc)
++				return c;
++			c++;
++		}
++	
++		return 0;
++	}
++
++
++public:	
++	int calcFDWrite(fd_set &fd) {
++		ClientIterator c;
++		int count = 0;
++		
++		c = clientList.begin();
++		while (c != clientList.end()) {
++			if (c->writeBuffer.size() > 0) {
++				FD_SET( c->fDesc, &fd );
++				count++;
++				c++;
++			} else {
++				if (c->finished) {
++					close(c->fDesc);
++					clientList.erase(c);
++					c = clientList.begin();
++				} else {
++					c++;
++				}
++			}
++		} 
++		return count;
++	}
++	
++	void calcFDRead(fd_set &fd) {
++		ClientIterator c;
++		
++		c = clientList.begin();
++		while (c != clientList.end()) {
++			FD_SET( c->fDesc, &fd );
++			c++;
++		} 
++	}
++
++	int getMaxSocket() {
++		int maxSocket = 0;
++		ClientIterator c;
++		c = clientList.begin();
++		while (c != clientList.end()) {
++			if ( (c->fDesc) && (c->fDesc > maxSocket) )
++				maxSocket = c->fDesc;
++			c++;
++		}
++		return maxSocket;
++	}
++
++	int getMinSocket() {
++		int minSocket = 0;
++		ClientIterator c;
++		c = clientList.begin();
++		while (c != clientList.end()) {
++			if ( (c->fDesc) && (c->fDesc < minSocket) )
++				minSocket = c->fDesc;
++			c++;
++		}
++		return minSocket;
++	}
++	
++	void clearWBuffers() {
++		ClientIterator c;
++		c = clientList.begin();
++		while (c != clientList.end()) {
++			c->writeBuffer.clear(); 
++			c++;
++		}
++	}
++	
++	void erase( const int fDesc ) {
++		ClientIterator c;
++		if ((c = locateFDesc(fDesc)) != 0) {
++			clientList.erase(c);
++			close(fDesc);
++		}
++	}
++
++	void finish( const int fDesc ) {
++		ClientIterator c;
++		if ((c = locateFDesc(fDesc)) != 0) {
++			c->finished = true;
++		}
++	}
++
++	void address( const int fDesc, char address[HTTP_IP_ADDR_LEN] ) {
++		ClientIterator c;
++		if ((c = locateFDesc(fDesc)) != 0) {
++			strncpy(address, c->address, HTTP_IP_ADDR_LEN);
++		}
++	}
++	
++	int getNumClients() {
++		return clientList.size();
++	}
++
++	int readBuf(const int fDesc, char *destBuf, const uint len) {
++		ClientIterator c;
++		if ((c = locateFDesc(fDesc)) == 0) {
++			// printf("unknown client id %d\n", fDesc);
++			return 0;
++		}
++	
++		memcpy( destBuf, &(c->readBuffer[0]), min( len, c->readBuffer.size() ) );
++		erase_(c->readBuffer, 0, (min( len, c->readBuffer.size()) - 1 ));
++		return 1;
++	}
++		
++	int readLine(const int fDesc, char *destBuf, const uint len) {
++		ClientIterator c;
++		if ((c = locateFDesc(fDesc)) == 0) {
++			// printf("unknown client id %d\n", fDesc);
++			return 0;
++		}
++		BufferIterator lineEnd;
++
++		if((lineEnd = std::find_(c->readBuffer, '\n')) != c->readBuffer.end()) {
++			if (*(lineEnd - 1) == '\r') {
++				c->readBuffer.erase(lineEnd - 1);
++				lineEnd--;
++			}
++			unsigned int lineLength = (uint) min( ((uint) len), (uint) (&(*lineEnd) - &(c->readBuffer[0])) );
++			
++			memcpy( destBuf, &(c->readBuffer[0]), lineLength + 1 );
++			destBuf[lineLength] = 0;
++			erase_(c->readBuffer, 0, lineLength + 1);
++			return 1;
++		} else {
++			return 0;
++		}
++	}
++
++	int handleWrite(int socket) {
++		int bytesWritten;
++		ClientIterator c;
++		if ((c = locateFDesc(socket)) == 0) {
++			// printf("unknown client id %d\n", socket);
++			return 2;
++		}
++
++		if ( (bytesWritten = send(socket, &(c->writeBuffer[c->bytesSent]), c->writeBuffer.size() - c->bytesSent, 0)) <= 0) {
++			// printf("lost connection to client\n");
++			return 1;
++		} else {
++			c->bytesSent += bytesWritten;
++			if ( (unsigned int) c->bytesSent == c->writeBuffer.size())
++			{
++				// all done
++				c->bytesSent = 0;
++				c->writeBuffer.clear();
++			}
++			return 0;
++		}
++	} 
++		
++	int handleExisting( const int fDesc ) {	
++		char buffer[READBUFSIZE];	// Buffer for socket reads
++		int bytesRead;
++	
++		bzero(buffer, READBUFSIZE);
++	
++		if ( (bytesRead = recv(fDesc, buffer, READBUFSIZE, 0)) <= 0) {
++			// printf("lost connection to client\n");
++			return 1;
++		} else {
++			ClientIterator c;
++			if ((c = locateFDesc(fDesc)) == 0) {
++				// printf("unknown client id %d\n", fDesc);
++				return 2;
++			}
++			// append new data to read buffer
++			c->readBuffer.insert(c->readBuffer.end(), buffer, buffer + bytesRead);
++
++			return 0;
++		}
++	}
++
++	int handleNew(httpd *server) {
++		int newSocket;
++		struct  sockaddr_in     addr;
++		size_t  addrLen;
++		char	*ipaddr;
++	
++		bzero(&addr, sizeof(addr));
++		addrLen = sizeof(addr);
++
++		if ( (newSocket = accept(server->serverSock,(struct sockaddr *)&addr, (socklen_t *)&addrLen)) < 0 )
++			return -1;
++
++		_httpd_setnonblocking(newSocket);
++
++		Client c;
++		c.fDesc = newSocket;
++		c.finished = false;
++		c.bytesSent = 0;
++		
++		ipaddr = inet_ntoa(addr.sin_addr);
++		if (ipaddr)
++			strncpy(c.address, ipaddr, HTTP_IP_ADDR_LEN);
++		else
++			bzero(&c.address, sizeof(c.address));
++
++		clientList.push_back(c);
++		return(newSocket);
++	}
++	
++	void doWrite(const int fDesc, const char* string, const uint len) {
++		ClientIterator c;
++		if ((c = locateFDesc(fDesc)) == 0) {
++			clientList.erase(c);
++			close(fDesc);
++		}
++	
++		c->writeBuffer.insert( c->writeBuffer.end(), string, string + len );
++	}
++
++	inline void doWrite(Client *c, const char* string, const uint len) {
++		c->writeBuffer.insert( c->writeBuffer.end(), string, string + len );
++	}
++
++	void doWrite(const int fDesc, const char* string) {
++		ClientIterator c;
++		if ((c = locateFDesc(fDesc)) == 0) {
++			clientList.erase(c);
++			close(fDesc);
++		}
++
++		c->writeBuffer.insert( c->writeBuffer.end(), string, string+strlen(string)-1 );
++	}
++
++	inline void doWrite(Client *c, const char* string) {
++		c->writeBuffer.insert( c->writeBuffer.end(), string, string+strlen(string)-1 );
++	}
++
++	void doWrite(const char* string) {
++		ClientIterator c;
++		c = clientList.begin();
++		while (c != clientList.end()) {
++			c->writeBuffer.insert( c->writeBuffer.end(), string, string+strlen(string) );
++			c++;
++		}
++	}
++
++};
++
++
++void handleSelectError( httpd *server );
++void handleSelectTimeout( httpd *server, const int fDesc ); 
++void handleSelectRead( httpd *server, const int fDesc ); 
++void handleSelectWrite( httpd *server, const int fDesc ); 
++
++int getMinSocket(httpd *server);
++int getMaxSocket(httpd *server);
++void calcFDRead(httpd *server, fd_set &fdRead); 
++int calcFDWrite(fd_set &fdWrite);
++
++int httpdSelectLoop( httpd *server, struct timeval timeout );
++
++#endif
+diff -urN libhttpd-1.3/src/version.c libhttpd-1.3-persistent-e/src/version.c
+--- libhttpd-1.3/src/version.c	2002-11-24 19:15:51.000000000 -0700
++++ libhttpd-1.3-persistent-e/src/version.c	2003-08-21 17:49:39.000000000 -0600
+@@ -14,7 +14,7 @@
+ ** connection with the use or performance of this software.
+ **
+ **
+-** $Id$
++** $Id$
+ **
+ */
+ 

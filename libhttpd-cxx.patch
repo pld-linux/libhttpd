@@ -1,0 +1,28 @@
+diff -ur libhttpd-1.3-orig/configure.in libhttpd-1.3/configure.in
+--- libhttpd-1.3-orig/configure.in	2003-10-26 07:56:40.000000000 -0700
++++ libhttpd-1.3/configure.in	2003-10-26 07:57:59.000000000 -0700
+@@ -10,8 +10,8 @@
+ 
+ echo "Configuring libhttpd"
+ 
+-AC_PROG_CC
+-if test "$ac_cv_prog_CC" = "g++"; 
++AC_PROG_CXX
++if test "$ac_cv_prog_CXX" = "g++"; 
+ then
+ 	WALL=-Wall
+ else
+Only in libhttpd-1.3: configure.in~
+diff -ur libhttpd-1.3-orig/Site.mm.in libhttpd-1.3/Site.mm.in
+--- libhttpd-1.3-orig/Site.mm.in	2002-02-25 22:41:18.000000000 -0700
++++ libhttpd-1.3/Site.mm.in	2003-10-26 07:58:47.000000000 -0700
+@@ -3,7 +3,7 @@
+ #
+ 
+ 
+-COMPILER= @CC@
++COMPILER= @CXX@
+ WALL= @WALL@
+ VERSION= "@VERSION@"
+ INST_DIR= /usr/local/nk
+Only in libhttpd-1.3: Site.mm.in~
