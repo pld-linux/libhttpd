@@ -1,4 +1,5 @@
 Summary:	Hughes embedded webserver static library
+Summary(pl):	Statyczna biblioteka osadzanego serwera WWW firmy Hughes
 Name:		libhttpd
 Version:	1.3
 Release:	0.1
@@ -9,12 +10,17 @@ Source0:	http://www.hughes.com.au/products/libhttpd/%{name}-1.3.tar.gz
 Patch0:		%{name}-persistent-e.patch
 Patch1:		%{name}-cxx.patch
 URL:		http://www.hughes.com.au/products/libhttpd/
+BuildRequires:	autoconf
 BuildRequires:	gcc-c++
 BuildRoot:	%{tmpdir}/%{name}-%{version}-root-%(id -u -n)
 
 %description
-Hughes embedded webserver library with persistence and non-blocking patches
-for daapd.
+Hughes embedded webserver library with persistence and non-blocking
+patches for daapd.
+
+%description -l pl
+Biblioteka osadzanego serwera WWW z utrzymywaniem po³±czeñ i ³atami
+nieblokuj±cymi dla daapd.
 
 %prep
 %setup -q
@@ -28,9 +34,10 @@ for daapd.
 
 %install
 rm -rf $RPM_BUILD_ROOT
-install -d $RPM_BUILD_ROOT/{%{_libdir},%{_includedir}}
-install src/libhttpd.a $RPM_BUILD_ROOT/%{_libdir}
-install src/httpd.h $RPM_BUILD_ROOT/%{_includedir}
+install -d $RPM_BUILD_ROOT{%{_libdir},%{_includedir}}
+
+install src/libhttpd.a $RPM_BUILD_ROOT%{_libdir}
+install src/httpd.h $RPM_BUILD_ROOT%{_includedir}
 
 %clean
 rm -rf $RPM_BUILD_ROOT
