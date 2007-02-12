@@ -1,5 +1,5 @@
 Summary:	Hughes embedded webserver static library
-Summary(pl):	Statyczna biblioteka osadzanego serwera WWW firmy Hughes
+Summary(pl.UTF-8):   Statyczna biblioteka osadzanego serwera WWW firmy Hughes
 Name:		libhttpd
 Version:	1.3
 Release:	0.1
@@ -18,9 +18,9 @@ BuildRoot:	%{tmpdir}/%{name}-%{version}-root-%(id -u -n)
 Hughes embedded webserver library with persistence and non-blocking
 patches for daapd.
 
-%description -l pl
-Biblioteka osadzanego serwera WWW z utrzymywaniem po³±czeñ i ³atami
-nieblokuj±cymi dla daapd.
+%description -l pl.UTF-8
+Biblioteka osadzanego serwera WWW z utrzymywaniem poÅ‚Ä…czeÅ„ i Å‚atami
+nieblokujÄ…cymi dla daapd.
 
 %prep
 %setup -q
