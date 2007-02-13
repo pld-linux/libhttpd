@@ -1,5 +1,5 @@
 Summary:	Hughes embedded webserver static library
-Summary(pl.UTF-8):   Statyczna biblioteka osadzanego serwera WWW firmy Hughes
+Summary(pl.UTF-8):	Statyczna biblioteka osadzanego serwera WWW firmy Hughes
 Name:		libhttpd
 Version:	1.3
 Release:	0.1
